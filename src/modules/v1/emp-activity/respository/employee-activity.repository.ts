@@ -35,9 +35,7 @@ export class EmployeeActivityRepository {
     }
 
     async getEmployeesList(query) {
-        const matchQuery = {
-
-        };
+        const matchQuery = {};
         let sortBy = -1;
         if(query.employeeId) {
             matchQuery['employee'] = query.employeeId
@@ -45,42 +43,49 @@ export class EmployeeActivityRepository {
         if(query.sortBy) {
             sortBy = query.sortBy == 'asc' ? 1 : -1
         }
-        console.log(matchQuery)
-        return await this.employeeActivityModel.aggregate([
-            {
-                $match: matchQuery
-            },
-            {
-                $lookup: {
-                    from: 'employees',
-                    localField: 'employee',
-                    foreignField: 'employee_id',
-                    as: 'employee'
-                }
-            },
-            {
-                $unwind: '$employee'
-            },
-            {
-                $group: {
-                    _id: '$employee.employee_id',
-                    'total_points': {
-                        $sum: {
-                            $sum: '$activities.points_earned'
-                        }
-                    },
-                    employee: { $first : '$employee'}
-                }
-            },
-            {
-                $project: {
-                    _id: 0,
-                    total_points: 1,
-                    name: '$employee.name',
-                    employee_id: '$employee.employee_id'
-                }
+        var pipeline: any = [
+        {
+            $match: matchQuery
+        },
+        {
+            $lookup: {
+                from: 'employees',
+                localField: 'employee',
+                foreignField: 'employee_id',
+                as: 'employee'
             }
-        ]).sort( { total_points: query.sortBy } ).exec()
+        },
+        {
+            $unwind: '$employee'
+        },
+        {
+            $group: {
+                _id: '$employee.employee_id',
+                'total_points': {
+                    $sum: {
+                        $sum: '$activities.points_earned'
+                    }
+                },
+                employee: { $first : '$employee'}
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                total_points: 1,
+                name: '$employee.name',
+                employee_id: '$employee.employee_id'
+            }
+        }
+        ];
+        // console.log('#######', pipeline.length)
+        pipeline.push({ $sort : { total_points: sortBy }})
+        if(query.limit && query.page) {
+            pipeline.push({ $skip: Number(query.limit) * Number(query.page) });
+            pipeline.push({ $limit: Number(query.limit) });
+        }
+        console.log('#######',  pipeline)
+        return await this.employeeActivityModel.aggregate(pipeline).exec()
     }
 
     async getEmployeeActivities(employeeId, query) {
@@ -153,6 +158,6 @@ export class EmployeeActivityRepository {
                     },
                 }
             }
-        ])
+        ]).exec()
     }
 }
